@@ -2,14 +2,31 @@
 Functions for applying empirical Bayes to a set of test statistics.
 """;
 
+using Discretizers
+using Distributions
+using Interpolations
+using DataFrames
+using GLM
+
+
 """
     discretize_test_statistics(test_statistics[, discretization])
 
 Bin the values in test_statistics into n uniform width bins.
-Returns the midpoints of the bins & the counts in each bin.
+Returns the midpoints of the bins, the counts in each bin and the bin width.
 """
 function discretize_test_statistics(test_statistics, n)
-    nothing
+    # Calculate midpoints
+    min_ts, max_ts = extrema(test_statistics)
+    bin_width = (max_ts - min_ts) / n
+    midpoints = [i*bin_width - bin_width/2 for i in 1:n]
+
+    # Get counts for each bin
+    bin_edges = binedges(DiscretizeUniformWidth(n), test_statistics)
+    lindisc = LinearDiscretizer(bin_edges)
+    counts = get_discretization_counts(lindisc, test_statistics)
+
+    return midpoints, counts, bin_width
 end
 
 
