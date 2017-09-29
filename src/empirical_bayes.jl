@@ -10,16 +10,16 @@ using GLM
 
 
 """
-    discretize_test_statistics(test_statistics[, discretization])
+    discretize_test_statistics(test_statistics::AbstractArray{<:AbstractFloat, 1}, n::Int)
 
 Bin the values in test_statistics into n uniform width bins.
 Returns the midpoints of the bins, the counts in each bin and the bin width.
 """
-function discretize_test_statistics(test_statistics, n)
+function discretize_test_statistics(test_statistics::AbstractArray{<:AbstractFloat, 1}, n::Int)
     # Calculate midpoints
     min_ts, max_ts = extrema(test_statistics)
     bin_width = (max_ts - min_ts) / n
-    midpoints = [i*bin_width - bin_width/2 for i in 1:n]
+    midpoints = [min_ts + i*bin_width - bin_width/2 for i in 1:n]
 
     # Get counts for each bin
     bin_edges = binedges(DiscretizeUniformWidth(n), test_statistics)
