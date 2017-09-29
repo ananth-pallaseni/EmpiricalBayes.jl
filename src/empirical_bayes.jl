@@ -109,7 +109,8 @@ function get_gamma_parameters(C, eta1, eta2)
 
     # Find p0 by solving the following:
     # log(p0) = C + log(gammafunc(eta2 + 1) / (-eta1)^(eta2 + 1))
-    p0 = exp(C + log(gamma(eta2 + 1) / (-eta1)^(eta2 + 1)))
+    #p0 = exp(C + log(gamma(eta2 + 1) / (-eta1)^(eta2 + 1)))
+    p0 = 0
 
     return k, theta, p0
 end
