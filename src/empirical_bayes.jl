@@ -77,9 +77,13 @@ function estimate_poisson_parameters(num_bins, bin_width, midpoints, counts)
     # Get the log of the counts
     log_counts = log.(counts)
 
+    # Filter out non finite
+    log_counts = [isfinite(x) ? x : eps() for x in log_counts]
+
     # Minus difference h to create regression target
     h = log(num_bins * bin_width)
     y = log_counts - h
+
 
     # Construct and solve the regression problem
     data = DataFrame(Y = y, X2 = midpoints, X3 = log.(midpoints))
@@ -109,8 +113,9 @@ function get_gamma_parameters(C, eta1, eta2)
 
     # Find p0 by solving the following:
     # log(p0) = C + log(gammafunc(eta2 + 1) / (-eta1)^(eta2 + 1))
-    #p0 = exp(C + log(gamma(eta2 + 1) / (-eta1)^(eta2 + 1)))
+    # p0 = exp(C + log(gamma(eta2 + 1) / (-eta1)^(eta2 + 1)))
     p0 = 0
+
 
     return k, theta, p0
 end
@@ -124,15 +129,20 @@ method outlined in Schwarzman 2009: https://projecteuclid.org/euclid.aoas/123142
 function fit_null_distribution(midpoints, counts, num_bins, bin_width, proportion_to_keep)
     # Remove highest test statistics, that dont fit the zero assumption
     midpoints, counts = keep_bottom_proportion_of_hist(midpoints, counts, proportion_to_keep)
-    println(midpoints, counts)
 
     # Estimate poisson parameters using regression
     C, eta1, eta2 = estimate_poisson_parameters(num_bins, bin_width, midpoints, counts)
-    println(C, " ", eta1, " ", eta2)
 
     # Calculate gamma parameters
     k, theta, p0 = get_gamma_parameters(C, eta1, eta2)
-    println(k, " ", theta, " ", p0)
+
+    params_valid = k > zero(k) && theta > zero(theta)
+    if !params_valid
+        error_string = "Error: resulting gamma parameters are invalid. Got k = ", k, " and Θ = ", theta, ".
+        Input data might not be gamma distributed, or number of bins needs to change.
+        Exiting"
+        error(error_string)
+    end
 
     # Create gamma distribution
     f0_distr = Gamma(k, theta)
@@ -147,7 +157,7 @@ end
 Fit a cubic spline distribution to the discretized inputs.
 """
 function fit_mixture_distribution(midpoints, counts, bin_width)
-  nothing
+    nothing
 end
 
 
