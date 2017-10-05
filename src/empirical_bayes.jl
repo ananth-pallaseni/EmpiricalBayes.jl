@@ -157,7 +157,27 @@ end
 Fit a cubic spline distribution to the discretized inputs.
 """
 function fit_mixture_distribution(midpoints, counts, bin_width)
-    nothing
+    # Add some zero bins on the beginning to prevent curve going negative
+    number_of_zero_bins = 10 #3
+    zero_bins = zeros(number_of_zero_bins)
+    unshift!(counts, zero_bins...)
+    for i in 1 : number_of_zero_bins
+        unshift!(midpoints, midpoints[1] - bin_width)
+    end
+
+    # Normalize counts
+    num_statsitics = sum(counts)
+    counts = counts / (num_statsitics * bin_width)
+
+    # Fit spline to histogram points
+    interpolation = interpolate(counts, BSpline(Cubic(Line())), OnCell())
+    r = midpoints[1] : (midpoints[end]-midpoints[1]) / (length(midpoints)-1) : midpoints[end]
+    scaled_interpolation = Interpolations.scale(interpolation, r)
+
+    fhat(x) = max(scaled_interpolation[x], 0)
+    fhat(x::AbstractArray) = [fhat(i) for i in x]
+
+    return fhat
 end
 
 

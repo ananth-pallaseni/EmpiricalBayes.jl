@@ -71,7 +71,7 @@ basic_test_target = [0.0       ,2.32616e-10,1.22024e-7 ,4.043e-6   ,4.32361e-5 ,
 ######## Random Tests
 @testset "Null Random Tests" begin
 
-num_random_tests = 1000
+num_random_tests = 300
 for _ in 1:num_random_tests
     α = Int(round(rand()*10)) + 3
     β = Int(round(rand()*10)) + 0.01
@@ -87,7 +87,7 @@ for _ in 1:num_random_tests
     test_values = [test_distr(x) for x in 0:0.01:20]
     hellinger_dist = hellinger(ref_values, test_values)
 
-    @test hellinger_dist < 0.3
+    @test hellinger_dist < 0.4
 end
 
 end
@@ -103,6 +103,27 @@ end
 
 ############################# Fit Mixture ############################
 @testset "Mixture Fit Tests" begin
+
+######## Basic Test - fit spline to standard normal
+ref_distr = Normal(0,1);
+test_stats = rand(ref_distr, 1000);
+test_mids, test_counts, test_width = discretize_test_statistics(test_stats, 10);
+fh = fit_mixture_distribution(test_mids, test_counts, test_width);
+test_vals = [fh(x) for x in -5:0.01:5];
+ref_vals = [pdf(ref_distr, x) for x in -5:0.01:5];
+hellinger_dist = hellinger(test_vals, ref_vals)
+@test hellinger_dist < 0.2
+
+######## Basic Test 2 - fit spline to standard normal with more bins
+ref_distr = Normal(0,1);
+test_stats = rand(ref_distr, 1000);
+test_mids, test_counts, test_width = discretize_test_statistics(test_stats, 50);
+fh = fit_mixture_distribution(test_mids, test_counts, test_width);
+test_vals = [fh(x) for x in -5:0.01:5];
+ref_vals = [pdf(ref_distr, x) for x in -5:0.01:5];
+hellinger_dist = hellinger(test_vals, ref_vals)
+@test hellinger_dist < 0.2
+
 
 end
 
