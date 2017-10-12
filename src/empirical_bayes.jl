@@ -171,7 +171,7 @@ function fit_mixture_distribution(midpoints, counts, bin_width)
 
     # Fit spline to histogram points
     interpolation = interpolate(counts, BSpline(Cubic(Line())), OnCell())
-    r = midpoints[1] : (midpoints[end]-midpoints[1]) / (length(midpoints)-1) : midpoints[end]
+    r = linspace(midpoints[1], midpoints[end], length(midpoints))
     scaled_interpolation = Interpolations.scale(interpolation, r)
 
     fhat(x) = max(scaled_interpolation[x], 0)
@@ -182,11 +182,44 @@ end
 
 
 """
-    calculate_posterior(priors, null_distr, mixture_distr)
+    calculate_posterior(priors, test_statistics, null_distr, mixture_distr, w0=0.0)
 
 Calculate the empirical Bayes posterior using the priors, null distribution and
 mixture distribution.
+
+# Arguments
+- `priors` : one dimensional list of prior values.
+- `test_statistics` : list of test statistics that correspond to the priors,
+   such that `test_statistics[i]` is the statistic for `priors[i]`.
+- `null_distr` : function representing the null distribution of test statistics
+- `mixture_distr` : function representing the mixture distribution of test statistics
+- `w0=0` : the neutral value to use in prior calculations. Defaults to zero.
 """
-function calculate_posterior(priors, null_distr, mixture_distr)
-  nothing
+function calculate_posterior(priors, test_statistics, null_distr, mixture_distr, w0=0.0)
+    # Prior function
+    prior_fn(x) = exp(w0) / ( exp(w0) + exp(x) )
+
+    num_test_statistics = length(test_statistics)
+
+    # Posterior array
+    posterior = Array{Float64}(num_test_statistics)
+
+    for i in 1:num_test_statistics
+        ts = test_statistics[i]
+        prior_val = prior_fn(priors[i])
+        null_val = null_distr(ts)
+        mix_val = mixture_distr(ts)
+
+        # if mixture distr equals 0, then just return a 0 posterior
+        if mix_val == zero(mix_val)
+            posterior[i] = 0.0
+            continue
+        end
+
+        fdr = null_val / mix_val
+        p1 = 1 - prior_val * fdr
+        posterior[i] = p1
+    end
+
+    return posterior
 end
