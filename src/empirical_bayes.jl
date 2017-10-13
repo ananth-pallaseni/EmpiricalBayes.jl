@@ -55,12 +55,10 @@ function keep_bottom_proportion_of_hist(midpoints, counts, proportion_to_keep)
         cur_bin += 1
     end
 
-    # Remove bins containing values that are too high
-    counts = counts[1:cur_bin-1]
-    midpoints = midpoints[1:cur_bin-1]
-
-    # Remove excess values from the last bin that stays
-    counts[cur_bin-1] -= cur_total - to_keep
+    # Only keep bins whose entire counts are within the kept interval
+    final_bin = cur_total == to_keep ? cur_bin-1 : cur_bin-2
+    counts = counts[1:final_bin]
+    midpoints = midpoints[1:final_bin]
 
     return midpoints, counts
 end
