@@ -4,8 +4,6 @@ using Base.Test
 using Distributions
 using Distances
 
-# write your own tests here
-#@test 1 == 2
 
 ############################# Discretization ###########################
 
@@ -49,7 +47,21 @@ end
 end
 
 
+############################# Truncating ###########################
 
+@testset "Truncate histogram tests" begin
+
+######## Basic Test
+mids, counts, bin_width = discretize_test_statistics(collect(Float64, 1:100), 10)
+
+proportions = [0.89, 0.9, 0.91, 1.0]
+targets = [8, 9, 9, 10]
+
+for i in 1:length(proportions)
+    @test EmpiricalBayes.keep_bottom_proportion_of_hist(mids, counts, proportions[i], true) == (mids[1:targets[i]], counts[1:targets[i]])
+end
+
+end
 
 
 ############################# Fit Null ###############################
@@ -59,7 +71,7 @@ end
 ######## Basic test
 mids, counts, width = discretize_test_statistics([1, 1.5, 1.2, 2, 2,2,2,2,2, 2.3, 2.7, 3, 3.3, 3.9, 4], 3)
 
-f = fit_null_distribution(mids, counts, 3, width, 1.0)
+f = fit_null_distribution(mids, counts, 3, width, 1.0, verbose = false)
 
 basic_test_result = f.(0:0.1:10)
 
@@ -82,7 +94,7 @@ for _ in 1:num_random_tests
     num_bins = 3 + Int(round(rand()*100))
     rmids, rcounts, rwidths = discretize_test_statistics(rand_test_stats, num_bins)
 
-    test_distr = fit_null_distribution(rmids, rcounts, num_bins, rwidths, 1.0)
+    test_distr = fit_null_distribution(rmids, rcounts, num_bins, rwidths, 1.0, verbose = false)
 
     ref_values = [pdf(reference_distr, x) for x in 0:0.01:20]
     test_values = [test_distr(x) for x in 0:0.01:20]
@@ -103,7 +115,7 @@ end
 gamma_distr = Gamma(0.001, 5.0)
 ref_test_stats = rand(gamma_distr, 100)
 tmids, tcounts, twidths = discretize_test_statistics(ref_test_stats, 10)
-@test_throws ErrorException fit_null_distribution(tmids, tcounts, 10, twidths, 1.0)
+@test_throws ErrorException fit_null_distribution(tmids, tcounts, 10, twidths, 1.0, verbose = false)
 
 end
 

@@ -41,7 +41,7 @@ midpoints and counts for the truncated histogram.
 - `counts` : list of counts for the histogram bins.
 - `proportion_to_keep` : proportion of lowest values in the histogram to keep.
 """
-function keep_bottom_proportion_of_hist(midpoints, counts, proportion_to_keep)
+function keep_bottom_proportion_of_hist(midpoints, counts, proportion_to_keep, verbose)
     # Number of values to keep
     num_vals_total = sum(counts)
     to_keep = Int(round(proportion_to_keep * num_vals_total))
@@ -59,6 +59,11 @@ function keep_bottom_proportion_of_hist(midpoints, counts, proportion_to_keep)
     final_bin = cur_total == to_keep ? cur_bin-1 : cur_bin-2
     counts = counts[1:final_bin]
     midpoints = midpoints[1:final_bin]
+
+    if verbose
+        kept_proportion = sum(counts) / num_vals_total
+        println("Kept $kept_proportion of test statistics")
+    end
 
     return midpoints, counts
 end
@@ -124,9 +129,9 @@ end
 Fit a gamma distribution to the discretized inputs. Usues the mode matching
 method outlined in Schwarzman 2009: https://projecteuclid.org/euclid.aoas/1231424213.
 """
-function fit_null_distribution(midpoints, counts, num_bins, bin_width, proportion_to_keep)
+function fit_null_distribution(midpoints, counts, num_bins, bin_width, proportion_to_keep; verbose = true)
     # Remove highest test statistics, that dont fit the zero assumption
-    midpoints, counts = keep_bottom_proportion_of_hist(midpoints, counts, proportion_to_keep)
+    midpoints, counts = keep_bottom_proportion_of_hist(midpoints, counts, proportion_to_keep, verbose)
 
     # Estimate poisson parameters using regression
     C, eta1, eta2 = estimate_poisson_parameters(num_bins, bin_width, midpoints, counts)
