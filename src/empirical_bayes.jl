@@ -10,12 +10,18 @@ using GLM
 
 
 """
-    discretize_test_statistics(test_statistics::AbstractArray{<:AbstractFloat, 1}, n::Int)
+    discretize_test_statistics(test_statistics::AbstractArray{<:Real}, n)
 
 Bin the values in test_statistics into n uniform width bins.
 Returns the midpoints of the bins, the counts in each bin and the bin width.
 """
-function discretize_test_statistics(test_statistics::AbstractArray{<:AbstractFloat, 1}, n::Int)
+function discretize_test_statistics(test_statistics::AbstractArray{<:Real}, n)
+    try
+        n = Int(n) # Bad form, but allows values like 10.0 to be silently used as 10
+    catch e
+        error("n must be an Int or convertible to an Int")
+    end
+
     # Calculate midpoints
     min_ts, max_ts = extrema(test_statistics)
     bin_width = (max_ts - min_ts) / n
@@ -42,6 +48,8 @@ midpoints and counts for the truncated histogram.
 - `proportion_to_keep` : proportion of lowest values in the histogram to keep.
 """
 function keep_bottom_proportion_of_hist(midpoints, counts, proportion_to_keep, verbose)
+    @assert 0.0 < proportion_to_keep <= 1.0
+
     # Number of values to keep
     num_vals_total = sum(counts)
     to_keep = Int(round(proportion_to_keep * num_vals_total))
@@ -225,4 +233,27 @@ function calculate_posterior(priors, test_statistics, null_distr, mixture_distr,
     end
 
     return posterior
+end
+
+
+
+"""
+    empirical_bayes(test_statistics, priors, num_bins, proportion_to_keep=1.0)
+
+Calculate the empirical Bayes posteriors of the input statistics using the priors.
+
+# Arguments
+- `test_statistics` : list of test statistics.
+- `priors` : one dimensional list of prior values that correspond with the
+   test_statistics, such that `priors[i]` is the prior for `test_statistics[i]`.
+- `num_bins::Integer` : number of uniform width bins to discretize into.
+- `proportion_to_keep=1.0` : Proportion of lowest test statistics to
+   keep when calculating null distribution.
+"""
+function empirical_bayes(test_statistics, priors, num_bins, proportion_to_keep=1.0)
+     midpoints, counts, bin_width = discretize_test_statistics(test_statistics, num_bins)
+     null_distr = fit_null_distribution(midpoints, counts, num_bins, bin_width, proportion_to_keep)
+     mixture_distr = fit_mixture_distribution(midpoints, counts, bin_width)
+     posteriors = calculate_posterior(priors, test_statistics, null_distr, mixture_distr)
+     return posteriors
 end

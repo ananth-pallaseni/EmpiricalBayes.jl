@@ -4,6 +4,7 @@ using Base.Test
 using Distributions
 using Distances
 
+data_folder_path = joinpath(dirname(@__FILE__), "data")
 
 ############################# Discretization ###########################
 
@@ -43,6 +44,17 @@ for _ in 1:num_random_tests
     @test isapprox(rwidths, bin_width, atol=0.00001)
 end
 end
+
+# Test silent type conversion
+mids, counts, bin_width = discretize_test_statistics(test_test_statistics, 3)
+fmids, fcounts, fwidth = discretize_test_statistics(test_test_statistics, 3.0)
+@test fmids == mids
+@test fcounts == counts
+@test fwidth == bin_width
+
+# Test invalid arguments
+@test_throws ErrorException discretize_test_statistics(test_test_statistics, 3.3)
+@test_throws MethodError discretize_test_statistics("1, 1.5, 1.2, 2, 2.3, 2.7, 3, 3.3, 3.9, 4", 3)
 
 end
 
@@ -124,23 +136,14 @@ end
 
 ######## Basic Test - fit spline to standard normal
 ref_distr = Normal(0,1);
-test_stats = rand(ref_distr, 1000);
+normal_samples_filepath = joinpath(data_folder_path, "normal_01_1000_samples.txt")
+test_stats = readdlm(normal_samples_filepath)
 test_mids, test_counts, test_width = discretize_test_statistics(test_stats, 10);
 fh = fit_mixture_distribution(test_mids, test_counts, test_width);
 test_vals = [fh(x) for x in -5:0.01:5];
 ref_vals = [pdf(ref_distr, x) for x in -5:0.01:5];
 hellinger_dist = hellinger(test_vals, ref_vals)
 @test hellinger_dist < 0.2
-
-######## Basic Test 2 - fit spline to standard normal with more bins
-ref_distr_2 = Normal(0,1);
-test_stats_2 = rand(ref_distr_2, 1000);
-test_mids_2, test_counts_2, test_width_2 = discretize_test_statistics(test_stats_2, 50);
-fh = fit_mixture_distribution(test_mids_2, test_counts_2, test_width_2);
-test_vals_2 = [fh(x) for x in -5:0.01:5];
-ref_vals_2 = [pdf(ref_distr_2, x) for x in -5:0.01:5];
-hellinger_dist_2 = hellinger(test_vals_2, ref_vals_2)
-@test hellinger_dist_2 < 0.3
 
 
 end
@@ -170,4 +173,24 @@ reference_post = [0.469082, 0.725626, 0.736384, 0.529118, 0.756652]
 test_post = calculate_posterior(test_priors, test_statistics, test_null, test_mix)
 @test test_post ≈ reference_post atol=0.000001
 
+end
+
+
+
+############################# empirical_bayes ####################
+@testset "Pipeline Tests" begin
+# Test that the function at least runs
+gamma_stats_filepath = joinpath(data_folder_path, "gamma_51_1000_samples.txt")
+gamma_stats = readdlm(gamma_stats_filepath)
+
+priors_filepath = joinpath(data_folder_path, "priors_random_1000_samples.txt")
+priors = readdlm(priors_filepath)
+
+eb_at_least_runs = true
+try
+eb = empirical_bayes(gamma_stats, priors, 10.0)
+catch
+eb_at_least_runs = false
+end
+@test eb_at_least_runs
 end
