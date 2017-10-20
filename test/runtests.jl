@@ -153,16 +153,16 @@ end
 @testset "Posterior Tests" begin
 
 ######## Basic Test
-test_post = calculate_posterior([0, 1], [0, 0], x->1, y->1)
+test_post = calculate_posterior([0, 0], [0, 1], x->1, y->1)
 @test test_post ≈ [0.5, 0.7310585786300049] atol=0.0001
 
-test_post = calculate_posterior([0, 1], [0, 0], x->2, y->1)
+test_post = calculate_posterior([0, 0], [0, 1], x->2, y->1)
 @test test_post ≈ [0.0, 0.4621171572600098] atol=0.0001
 
-test_post = calculate_posterior([0, 1], [1, 2], x->1, y->1)
+test_post = calculate_posterior([1, 2], [0, 1], x->1, y->1)
 @test test_post ≈ [0.5, 0.7310585786300049] atol=0.0001
 
-test_post = calculate_posterior([0, 1], [1, 2], x->1, y->0)
+test_post = calculate_posterior([1, 2], [0, 1], x->1, y->0)
 @test test_post ≈ [0.0, 0.0] atol=0.0001
 
 test_priors = [0, 1, 1, 0, 1]
@@ -170,8 +170,11 @@ test_statistics = [1, 2, 3, 4, 5]
 test_null(x) = pdf(Normal(2, 5), x)
 test_mix(x) = pdf(Normal(3, 5), x)
 reference_post = [0.469082, 0.725626, 0.736384, 0.529118, 0.756652]
-test_post = calculate_posterior(test_priors, test_statistics, test_null, test_mix)
+test_post = calculate_posterior(test_statistics, test_priors, test_null, test_mix)
 @test test_post ≈ reference_post atol=0.000001
+
+test_post = calculate_posterior([0, 0], x->1, y->1)
+@test test_post ≈ [0.5, 0.5] atol=0.0001
 
 end
 
@@ -193,4 +196,14 @@ catch
 eb_at_least_runs = false
 end
 @test eb_at_least_runs
+
+
+# Test that it runs without priors
+no_priors_eb_at_least_runs = true
+try
+eb = empirical_bayes(gamma_stats, 10.0)
+catch
+no_priors_eb_at_least_runs = false
+end
+@test no_priors_eb_at_least_runs
 end
