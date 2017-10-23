@@ -6,6 +6,13 @@ using Distances
 
 data_folder_path = joinpath(dirname(@__FILE__), "data")
 
+struct TestDist <: ContinuousUnivariateDistribution
+    x::Int
+end
+
+Distributions.pdf(d::TestDist, n) = d.x
+Distributions.mode(d::TestDist) = d.x
+
 ############################# Discretization ###########################
 
 @testset "Discretization Tests" begin
@@ -83,7 +90,8 @@ end
 ######## Basic test
 mids, counts, width = discretize_test_statistics([1, 1.5, 1.2, 2, 2,2,2,2,2, 2.3, 2.7, 3, 3.3, 3.9, 4], 3)
 
-f = fit_null_distribution(mids, counts, 3, width, 1.0, verbose = false)
+dist = fit_null_distribution(mids, counts, 3, width, 1.0, verbose = false)
+f(x) = pdf(dist, x)
 
 basic_test_result = f.(0:0.1:10)
 
@@ -107,9 +115,10 @@ for _ in 1:num_random_tests
     rmids, rcounts, rwidths = discretize_test_statistics(rand_test_stats, num_bins)
 
     test_distr = fit_null_distribution(rmids, rcounts, num_bins, rwidths, 1.0, verbose = false)
+    test_pdf(x) = pdf(test_distr, x)
 
     ref_values = [pdf(reference_distr, x) for x in 0:0.01:20]
-    test_values = [test_distr(x) for x in 0:0.01:20]
+    test_values = [test_pdf(x) for x in 0:0.01:20]
     hellinger_dist = hellinger(ref_values, test_values)
 
     @test hellinger_dist < 0.5
@@ -153,28 +162,39 @@ end
 @testset "Posterior Tests" begin
 
 ######## Basic Test
-test_post = calculate_posterior([0, 0], [0, 1], x->1, y->1)
+test_post = calculate_posterior([0, 0], [0, 1], TestDist(1), y->1, :two)
 @test test_post ≈ [0.5, 0.7310585786300049] atol=0.0001
 
-test_post = calculate_posterior([0, 0], [0, 1], x->2, y->1)
+test_post = calculate_posterior([0, 0], [0, 1], TestDist(2), y->1, :two)
 @test test_post ≈ [0.0, 0.4621171572600098] atol=0.0001
 
-test_post = calculate_posterior([1, 2], [0, 1], x->1, y->1)
+test_post = calculate_posterior([1, 2], [0, 1], TestDist(1), y->1, :two)
 @test test_post ≈ [0.5, 0.7310585786300049] atol=0.0001
 
-test_post = calculate_posterior([1, 2], [0, 1], x->1, y->0)
+test_post = calculate_posterior([1, 2], [0, 1], TestDist(1), y->0, :two)
 @test test_post ≈ [0.0, 0.0] atol=0.0001
 
 test_priors = [0, 1, 1, 0, 1]
 test_statistics = [1, 2, 3, 4, 5]
-test_null(x) = pdf(Normal(2, 5), x)
-test_mix(x) = pdf(Normal(3, 5), x)
+test_null_dist = Normal(2, 5)
+test_mix_pdf(x) = pdf(Normal(3, 5), x)
 reference_post = [0.469082, 0.725626, 0.736384, 0.529118, 0.756652]
-test_post = calculate_posterior(test_statistics, test_priors, test_null, test_mix)
+test_post = calculate_posterior(test_statistics, test_priors, test_null_dist, test_mix_pdf, :two)
 @test test_post ≈ reference_post atol=0.000001
 
-test_post = calculate_posterior([0, 0], x->1, y->1)
+# No prior
+test_post = calculate_posterior([0, 0], TestDist(1), y->1, :two)
 @test test_post ≈ [0.5, 0.5] atol=0.0001
+
+# One-tailed test, upper tail
+reference_post = [0.0, 0.0, 0.736384, 0.529118, 0.756652]
+test_post = calculate_posterior(test_statistics, test_priors, test_null_dist, test_mix_pdf, :upper)
+@test test_post ≈ reference_post atol=0.000001
+
+# One-tailed test, lower tail
+reference_post = [0.469082, 0.0, 0.0, 0.0, 0.0]
+test_post = calculate_posterior(test_statistics, test_priors, test_null_dist, test_mix_pdf, :lower)
+@test test_post ≈ reference_post atol=0.000001
 
 end
 
