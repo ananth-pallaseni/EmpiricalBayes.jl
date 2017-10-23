@@ -156,8 +156,7 @@ function fit_null_distribution(midpoints, counts, num_bins, bin_width, proportio
     end
 
     # Create gamma distribution
-    f0_distr = Gamma(k, theta)
-    f0(x) = pdf(f0_distr, x)
+    f0 = Gamma(k, theta)
 
     return f0
 end
@@ -193,7 +192,7 @@ end
 
 
 """
-    calculate_posterior(test_statistics, priors, null_distr, mixture_distr)
+    calculate_posterior(test_statistics, priors, null_distr, mixture_pdf, tail)
 
 Calculate the empirical Bayes posterior using the priors, null distribution and
 mixture distribution.
@@ -202,11 +201,14 @@ mixture distribution.
 - `test_statistics` : list of test statistics.
 - `priors` : one dimensional list of prior values that correspond with the
    test_statistics, such that `priors[i]` is the prior for `test_statistics[i]`.
-- `null_distr` : function representing the null distribution of test statistics
-- `mixture_distr` : function representing the mixture distribution of test statistics
+- `null_distr` : the null distribution of test statistics
+- `mixture_pdf` : function representing the mixture distribution of test statistics
+- `tail` : Whether the test is two-tailed (:two) or one-tailed (:lower or :upper)
 """
-function calculate_posterior(test_statistics, priors, null_distr, mixture_distr)
+function calculate_posterior(test_statistics, priors, null_distr, mixture_pdf, tail)
     @assert length(test_statistics) == size(priors, 1)
+
+    null_pdf(x) = pdf(null_distr, x)
 
     # Prior function
     w0 = 0
@@ -220,8 +222,8 @@ function calculate_posterior(test_statistics, priors, null_distr, mixture_distr)
     for i in 1:num_test_statistics
         ts = test_statistics[i]
         prior_val = prior_fn(priors[i])
-        null_val = null_distr(ts)
-        mix_val = mixture_distr(ts)
+        null_val = null_pdf(ts)
+        mix_val = mixture_pdf(ts)
 
         # if mixture distr equals 0, then just return a 0 posterior
         if mix_val == zero(mix_val)
@@ -234,24 +236,33 @@ function calculate_posterior(test_statistics, priors, null_distr, mixture_distr)
         posterior[i] = p1
     end
 
+    # Zero the lower tail for an upper-tailed test, or vice-versa
+    if tail == :upper || tail == :lower
+        null_mode = mode(null_distr)
+        compare = tail == :upper ? (<=) : (>=)
+        zero_indices = find(t -> compare(t, null_mode), test_statistics)
+        posterior[zero_indices] = 0.0
+    end
+
     return posterior
 end
 
 
 """
-    calculate_posterior(test_statistics, null_distr, mixture_distr)
+    calculate_posterior(test_statistics, null_distr, mixture_pdf, tail)
 
 Calculate the empirical Bayes posterior using no priors, null distribution and
 mixture distribution.
 
 # Arguments
 - `test_statistics` : list of test statistics.
-- `null_distr` : function representing the null distribution of test statistics
-- `mixture_distr` : function representing the mixture distribution of test statistics
+- `null_distr` : the null distribution of test statistics
+- `mixture_pdf` : function representing the mixture distribution of test statistics
+- `tail` : Whether the test is two-tailed (:two) or one-tailed (:lower or :upper)
 """
-function calculate_posterior(test_statistics, null_distr, mixture_distr)
+function calculate_posterior(test_statistics, null_distr, mixture_pdf, tail)
     priors = [0 for _ in test_statistics]
-    return calculate_posterior(test_statistics, priors, null_distr, mixture_distr)
+    return calculate_posterior(test_statistics, priors, null_distr, mixture_pdf, tail)
 end
 
 
@@ -268,12 +279,13 @@ Calculate the empirical Bayes posteriors of the input statistics using the prior
 - `num_bins::Integer` : number of uniform width bins to discretize into.
 - `proportion_to_keep=1.0` : Proportion of lowest test statistics to
    keep when calculating null distribution.
+- `tail=:two` : Whether the test is two-tailed (:two) or one-tailed (:lower or :upper)
 """
-function empirical_bayes(test_statistics, priors, num_bins; proportion_to_keep=1.0)
+function empirical_bayes(test_statistics, priors, num_bins; proportion_to_keep=1.0, tail=:two)
      midpoints, counts, bin_width = discretize_test_statistics(test_statistics, num_bins)
      null_distr = fit_null_distribution(midpoints, counts, num_bins, bin_width, proportion_to_keep)
-     mixture_distr = fit_mixture_distribution(midpoints, counts, bin_width)
-     posteriors = calculate_posterior(test_statistics, priors, null_distr, mixture_distr)
+     mixture_pdf = fit_mixture_distribution(midpoints, counts, bin_width)
+     posteriors = calculate_posterior(test_statistics, priors, null_distr, mixture_pdf, tail)
      return posteriors
 end
 
@@ -289,8 +301,9 @@ Calculate the empirical Bayes posteriors of the input statistics with null prior
 - `num_bins::Integer` : number of uniform width bins to discretize into.
 - `proportion_to_keep=1.0` : Proportion of lowest test statistics to
    keep when calculating null distribution.
+- `tail=:two` : Whether the test is two-tailed (:two) or one-tailed (:lower or :upper)
 """
-function empirical_bayes(test_statistics, num_bins; proportion_to_keep=1.0)
+function empirical_bayes(test_statistics, num_bins; proportion_to_keep=1.0, tail=:two)
     priors = [0 for _ in test_statistics]
-    return empirical_bayes(test_statistics, priors, num_bins, proportion_to_keep=proportion_to_keep)
+    return empirical_bayes(test_statistics, priors, num_bins, proportion_to_keep=proportion_to_keep, tail=tail)
 end
