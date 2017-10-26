@@ -37,7 +37,7 @@ end
 
 
 """
-    keep_bottom_proportion_of_hist(midpoints, counts, proportion_to_keep)
+    keep_bottom_proportion_of_hist(midpoints, counts, proportion_to_keep, verbose)
 
 Remove the highest proportion of values from a histogram. Returns the new
 midpoints and counts for the truncated histogram.
@@ -76,15 +76,16 @@ function keep_bottom_proportion_of_hist(midpoints, counts, proportion_to_keep, v
     return midpoints, counts
 end
 
+
 """
-    estimate_poisson_parameters(num_bins, bin_width, midpoints, counts)
+    estimate_fit_parameters(num_bins, bin_width, midpoints, counts, distr::Type{Gamma})
 
 Estimates the poisson parameters required to fit a mode matched null distribution
 to the input histogram. Solves the regression problem outlined in equations (6)
 and (8) in Schwarzman 2009 (https://projecteuclid.org/euclid.aoas/1231424213).
 Returns the parameters C, eta1, eta2
 """
-function estimate_poisson_parameters(num_bins, bin_width, midpoints, counts)
+function estimate_fit_parameters(num_bins, bin_width, midpoints, counts, distr::Type{Gamma})
     # Get the log of the counts
     log_counts = log.(counts)
 
@@ -97,22 +98,42 @@ function estimate_poisson_parameters(num_bins, bin_width, midpoints, counts)
 
 
     # Construct and solve the regression problem
-    data = DataFrame(Y = y, X2 = midpoints, X3 = log.(midpoints))
-    C, eta1, eta2 = coef(glm(@formula(Y ~ X2 + X3), data, Normal(), minStepFac = eps()))
+    data = DataFrame(Y = y, X1 = midpoints, X2 = log.(midpoints))
+    C, eta1, eta2 = coef(glm(@formula(Y ~ X1 + X2), data, Normal(), minStepFac = eps()))
 
     return C, eta1, eta2
 end
+"""
+    estimate_fit_parameters(num_bins, bin_width, midpoints, counts, distr::Type{Normal})
 
+Estimates the parameters required to fit a mode matched null distribution to the
+input histogram. Solves the regression problem outlined in equation (4.5) and (4.6)
+in Efron 2007 (https://projecteuclid.org/euclid.aos/1188405614).
+Returns the parameters beta0, beta1, beta2
+"""
+function estimate_fit_parameters(num_bins, bin_width, midpoints, counts, distr::Type{Normal})
+    # Get the log of the counts
+    log_counts = log.(counts)
+
+    # Filter out non finite
+    log_counts = [isfinite(x) ? x : eps() for x in log_counts]
+
+    # Construct and solve the regression problem
+    data = DataFrame(Y = log_counts, X1 = midpoints, X2 = midpoints.^2)
+    beta0, beta1, beta2 = coef(glm(@formula(Y ~ X1 + X2), data, Normal(), minStepFac = eps()))
+
+    return beta0, beta1, beta2
+end
 
 
 """
-    get_gamma_parameters(C, eta1, eta2)
+    get_distr_parameters(C, eta1, eta2, distr::Type{Gamma})
 
 Gets the parameters which describe a gamma distribution based on the poisson
 parameters input. Converts the poisson parameter inputs into a chi squared
 distribution, then converts that into a gamma distribution.
 """
-function get_gamma_parameters(C, eta1, eta2)
+function get_distr_parameters(C, eta1, eta2, distr::Type{Gamma})
 
     # Convert eta to chi squared parameters
     a = -(1 / (2*eta1))
@@ -122,30 +143,11 @@ function get_gamma_parameters(C, eta1, eta2)
     k = v/2
     theta = 2*a
 
+    # TODO: Decide what to do about p0
     # Find p0 by solving the following:
     # log(p0) = C + log(gammafunc(eta2 + 1) / (-eta1)^(eta2 + 1))
     # p0 = exp(C + log(gamma(eta2 + 1) / (-eta1)^(eta2 + 1)))
     p0 = 0
-
-
-    return k, theta, p0
-end
-
-"""
-    fit_null_distribution(midpoints, counts, num_bins, bin_width, proportion_to_keep)
-
-Fit a gamma distribution to the discretized inputs. Usues the mode matching
-method outlined in Schwarzman 2009: https://projecteuclid.org/euclid.aoas/1231424213.
-"""
-function fit_null_distribution(midpoints, counts, num_bins, bin_width, proportion_to_keep; verbose = true)
-    # Remove highest test statistics, that dont fit the zero assumption
-    midpoints, counts = keep_bottom_proportion_of_hist(midpoints, counts, proportion_to_keep, verbose)
-
-    # Estimate poisson parameters using regression
-    C, eta1, eta2 = estimate_poisson_parameters(num_bins, bin_width, midpoints, counts)
-
-    # Calculate gamma parameters
-    k, theta, p0 = get_gamma_parameters(C, eta1, eta2)
 
     params_valid = k > zero(k) && theta > zero(theta)
     if !params_valid
@@ -155,11 +157,52 @@ function fit_null_distribution(midpoints, counts, num_bins, bin_width, proportio
         error(error_string)
     end
 
-    # Create gamma distribution
-    f0 = Gamma(k, theta)
+    return k, theta, p0
+end
+"""
+    get_distr_parameters(beta0, beta1, beta2, distr::Type{Normal})
+
+Gets the parameters which describe a normal distribution based on the
+parameters input. Converts the quadratic parameter inputs into a normal
+distribution.
+"""
+function get_distr_parameters(beta0, beta1, beta2, distr::Type{Normal})
+
+    sigma = (-2 * beta2)^-(1/2)
+
+    mu = beta1 * sigma^2
+
+    # TODO: Decide what to do about p0
+    p0 = 0
+
+    return mu, sigma, p0
+end
+
+
+"""
+    fit_null_distribution(midpoints, counts, num_bins, bin_width, proportion_to_keep, distr, verbose=true)
+
+Fit a distribution to the discretized inputs. Uses mode-matching, since
+the input test statistics may have been truncated.
+"""
+function fit_null_distribution(midpoints, counts, num_bins, bin_width, proportion_to_keep, distr; verbose = true)
+
+    # Remove highest test statistics, that dont fit the zero assumption
+    midpoints, counts = keep_bottom_proportion_of_hist(midpoints, counts, proportion_to_keep, verbose)
+
+    # Estimate parameters using regression
+    param0, param1, param2 = estimate_fit_parameters(num_bins, bin_width, midpoints, counts, distr)
+
+    # TODO: Decide what to do about p0
+    # Calculate distribution parameters
+    k, theta, p0 = get_distr_parameters(param0, param1, param2, distr)
+
+    # Create distribution
+    f0 = distr(k, theta)
 
     return f0
 end
+
 
 """
     fit_mixture_distribution(midpoints, counts, bin_width)
@@ -192,7 +235,7 @@ end
 
 
 """
-    calculate_posterior(test_statistics, priors, null_distr, mixture_pdf, tail)
+    calculate_posterior(test_statistics, priors, null_distr, mixture_pdf, tail, w0=0.0)
 
 Calculate the empirical Bayes posterior using the priors, null distribution and
 mixture distribution.
@@ -204,8 +247,9 @@ mixture distribution.
 - `null_distr` : the null distribution of test statistics
 - `mixture_pdf` : function representing the mixture distribution of test statistics
 - `tail` : Whether the test is two-tailed (:two) or one-tailed (:lower or :upper)
+- `w0` : Default constant for the prior calculation
 """
-function calculate_posterior(test_statistics, priors, null_distr, mixture_pdf, tail)
+function calculate_posterior(test_statistics, priors, null_distr, mixture_pdf, tail; w0=0.0)
     @assert length(test_statistics) == size(priors, 1)
 
     null_pdf(x) = pdf(null_distr, x)
@@ -249,7 +293,7 @@ end
 
 
 """
-    calculate_posterior(test_statistics, null_distr, mixture_pdf, tail)
+    calculate_posterior(test_statistics, null_distr, mixture_pdf, tail, w0=0.0)
 
 Calculate the empirical Bayes posterior using no priors, null distribution and
 mixture distribution.
@@ -259,16 +303,17 @@ mixture distribution.
 - `null_distr` : the null distribution of test statistics
 - `mixture_pdf` : function representing the mixture distribution of test statistics
 - `tail` : Whether the test is two-tailed (:two) or one-tailed (:lower or :upper)
+- `w0` : Default constant for the prior calculation
 """
-function calculate_posterior(test_statistics, null_distr, mixture_pdf, tail)
+function calculate_posterior(test_statistics, null_distr, mixture_pdf, tail; w0=0.0)
     priors = [0 for _ in test_statistics]
-    return calculate_posterior(test_statistics, priors, null_distr, mixture_pdf, tail)
+    return calculate_posterior(test_statistics, priors, null_distr, mixture_pdf, tail, w0=w0)
 end
 
 
 
 """
-    empirical_bayes(test_statistics, priors, num_bins, proportion_to_keep=1.0)
+    empirical_bayes(test_statistics, priors, num_bins, distr; proportion_to_keep=1.0, tail=:two, w0 = 0.0)
 
 Calculate the empirical Bayes posteriors of the input statistics using the priors.
 
@@ -280,19 +325,20 @@ Calculate the empirical Bayes posteriors of the input statistics using the prior
 - `proportion_to_keep=1.0` : Proportion of lowest test statistics to
    keep when calculating null distribution.
 - `tail=:two` : Whether the test is two-tailed (:two) or one-tailed (:lower or :upper)
+- `w0` : Default constant for the prior calculation
 """
-function empirical_bayes(test_statistics, priors, num_bins; proportion_to_keep=1.0, tail=:two)
+function empirical_bayes(test_statistics, priors, num_bins, distr; proportion_to_keep=1.0, tail=:two, w0 = 0.0)
      midpoints, counts, bin_width = discretize_test_statistics(test_statistics, num_bins)
-     null_distr = fit_null_distribution(midpoints, counts, num_bins, bin_width, proportion_to_keep)
+     null_distr = fit_null_distribution(midpoints, counts, num_bins, bin_width, proportion_to_keep, distr)
      mixture_pdf = fit_mixture_distribution(midpoints, counts, bin_width)
-     posteriors = calculate_posterior(test_statistics, priors, null_distr, mixture_pdf, tail)
+     posteriors = calculate_posterior(test_statistics, priors, null_distr, mixture_pdf, tail, w0=w0)
      return posteriors
 end
 
 
 
 """
-    empirical_bayes(test_statistics, num_bins, proportion_to_keep=1.0)
+    empirical_bayes(test_statistics, num_bins, distr, proportion_to_keep=1.0, tail=:two, w0 = 0.0)
 
 Calculate the empirical Bayes posteriors of the input statistics with null priors.
 
@@ -302,8 +348,9 @@ Calculate the empirical Bayes posteriors of the input statistics with null prior
 - `proportion_to_keep=1.0` : Proportion of lowest test statistics to
    keep when calculating null distribution.
 - `tail=:two` : Whether the test is two-tailed (:two) or one-tailed (:lower or :upper)
+- `w0` : Default constant for the prior calculation
 """
-function empirical_bayes(test_statistics, num_bins; proportion_to_keep=1.0, tail=:two)
+function empirical_bayes(test_statistics, num_bins, distr; proportion_to_keep=1.0, tail=:two, w0 = 0.0)
     priors = [0 for _ in test_statistics]
-    return empirical_bayes(test_statistics, priors, num_bins, proportion_to_keep=proportion_to_keep, tail=tail)
+    return empirical_bayes(test_statistics, priors, num_bins, distr, proportion_to_keep=proportion_to_keep, tail=tail, w0=w0)
 end
