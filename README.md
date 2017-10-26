@@ -23,10 +23,10 @@ Pkg.clone("https://github.com/ananth-pallaseni/EmpiricalBayes.jl.git")
 Use the ```empirical_bayes``` function as follows:
 
 ```julia
-empirical_bayes(test_statistics, priors, num_bins)
+empirical_bayes(test_statistics, priors, num_bins, distr)
 ```
 
-where `test_statistics` and `priors` are lists such that `priors[i]` is the prior for `test_statistics[i]`. `num_bins` is the number of bins to discretize into.
+where `test_statistics` and `priors` are lists such that `priors[i]` is the prior for `test_statistics[i]`, `num_bins` is the number of bins to discretize into and `distr` is the form of the null distribution (currently `Gamma` and `Normal` are supported).
 
 This returns a list of posterior values such that `output[i]` is the posterior corresponding to applying `priors[i]` to `test_statistic[i]`.
 
@@ -43,17 +43,17 @@ discretize_test_statistics(test_statistics::AbstractArray{<:Real}, n)
 
 ```julia
 """
-Fit a gamma distribution to the discretized inputs. Usues the mode matching
-method outlined in Schwarzman 2009: https://projecteuclid.org/euclid.aoas/1231424213.
+Fit a distribution to the discretized inputs. Uses mode-matching, since
+the input test statistics may have been truncated.
 
-Returns a function that maps from x->pdf of null at x
+Returns the fitted distribution
 
 proportion_to_keep is the proportion of lowest valued test_statistics to keep before
 applying the mode-matching algorithm.
 
 verbose is whether or not to print the proportion of values kept.
 """
-fit_null_distribution(midpoints, counts, num_bins, bin_width, proportion_to_keep; verbose = true)
+fit_null_distribution(midpoints, counts, num_bins, bin_width, proportion_to_keep, distr; verbose = true)
 ```
 
 ```julia
@@ -73,8 +73,10 @@ Returns a list of posterior values such that `output[i]` is the posterior corres
 to applying `priors[i]` to `test_statistic[i]`.
 
 w0 is the base value for prior calculation - will probably never need to be changed.
+
+tail is whether to treat the test as two-tailed (:two) or one-tailed (:lower or :upper)
 """
-calculate_posterior(priors, test_statistics, null_distr, mixture_distr, w0=0.0)
+calculate_posterior(priors, test_statistics, null_distr, mixture_pdf, tail, w0=0.0)
 ```
 
 ```julia
@@ -87,5 +89,5 @@ to applying `priors[i]` to `test_statistic[i]`.
 proportion_to_keep is the proportion of lowest valued test_statistics to keep before
 applying the mode-matching algorithm when fitting the null distribution.
 """
-empirical_bayes(test_statistics, priors, num_bins, proportion_to_keep=1.0)
+empirical_bayes(test_statistics, priors, num_bins, proportion_to_keep=1.0, tail=:two, w0 = 0.0)
 ```

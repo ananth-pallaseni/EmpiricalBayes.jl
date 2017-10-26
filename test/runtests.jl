@@ -88,9 +88,11 @@ end
 @testset "Null Fit Tests" begin
 
 ######## Basic test
+
+# Gamma distribution
 mids, counts, width = discretize_test_statistics([1, 1.5, 1.2, 2, 2,2,2,2,2, 2.3, 2.7, 3, 3.3, 3.9, 4], 3)
 
-dist = fit_null_distribution(mids, counts, 3, width, 1.0, verbose = false)
+dist = fit_null_distribution(mids, counts, 3, width, 1.0, Gamma, verbose = false)
 f(x) = pdf(dist, x)
 
 basic_test_result = f.(0:0.1:10)
@@ -98,6 +100,15 @@ basic_test_result = f.(0:0.1:10)
 basic_test_target = [0.0       ,2.32616e-10,1.22024e-7 ,4.043e-6   ,4.32361e-5 ,0.000248819,0.000967622,0.0028712  ,0.00698951 ,0.0146273  ,0.0271695  ,0.0458241  ,0.0713679  ,0.103957   ,0.143041   ,0.187386   ,0.235202   ,0.284332   ,0.332473   ,0.377397   ,0.417133   ,0.450104   ,0.47521    ,0.491851   ,0.499911   ,0.499696   ,0.491862   ,0.477317   ,0.457138   ,0.43248    ,0.404504   ,0.374322   ,0.342946   ,0.311267   ,0.280033   ,0.249848   ,0.221176   ,0.194349   ,0.169582   ,0.14699,0.126606   ,0.108396   ,0.0922763  ,0.0781275  ,0.0658054  ,0.0551525  ,0.0460054  ,0.0382016  ,0.0315839  ,0.026004   ,0.0213245  ,0.01742    ,0.014178   ,0.0114984  ,0.00929344 ,0.00748661 ,0.00601195 ,0.004813   ,0.00384178 ,0.0030578  ,0.00242711 ,0.00192136 ,0.00151708 ,0.00119488 ,0.000938834,0.000735927,0.000575565,0.000449155,0.000349759,0.000271794,0.000210783,0.000163147,0.000126036,9.71871e-5 ,7.48064e-5 ,5.74787e-5 ,4.40894e-5 ,3.37629e-5 ,2.58132e-5 ,1.97041e-5 ,1.50178e-5,1.14288e-5,8.68487e-6,6.59029e-6,4.9939e-6 ,3.77907e-6,2.85596e-6,2.15554e-6,1.62483e-6,1.22327e-6,9.19837e-7,6.9085e-7 ,5.18267e-7,3.88356e-7,2.90686e-7,2.17344e-7,1.62333e-7,1.2112e-7 ,9.02779e-8,6.72221e-8,5.00055e-8 ]
 
 @test isapprox(basic_test_result, basic_test_target, atol=0.00001)
+
+# Normal distribution
+
+# Test statistics generated from Normal(0, 1) distribution
+ts = randn(1000)
+mids, counts, width = discretize_test_statistics(ts, 10)
+dist = fit_null_distribution(mids, counts, 10, width, 1.0, Normal, verbose = false)
+@test isapprox(mean(dist), 0, atol = 0.5)
+@test isapprox(std(dist), 1, atol = 0.5)
 
 
 ######## Random Tests
@@ -114,7 +125,7 @@ for _ in 1:num_random_tests
     num_bins = 3 + Int(round(rand()*100))
     rmids, rcounts, rwidths = discretize_test_statistics(rand_test_stats, num_bins)
 
-    test_distr = fit_null_distribution(rmids, rcounts, num_bins, rwidths, 1.0, verbose = false)
+    test_distr = fit_null_distribution(rmids, rcounts, num_bins, rwidths, 1.0, Gamma, verbose = false)
     test_pdf(x) = pdf(test_distr, x)
 
     ref_values = [pdf(reference_distr, x) for x in 0:0.01:20]
@@ -136,7 +147,7 @@ end
 gamma_distr = Gamma(0.001, 5.0)
 ref_test_stats = rand(gamma_distr, 100)
 tmids, tcounts, twidths = discretize_test_statistics(ref_test_stats, 10)
-@test_throws ErrorException fit_null_distribution(tmids, tcounts, 10, twidths, 1.0, verbose = false)
+@test_throws ErrorException fit_null_distribution(tmids, tcounts, 10, twidths, 1.0, Gamma, verbose = false)
 
 end
 
@@ -211,7 +222,7 @@ priors = readdlm(priors_filepath)
 
 eb_at_least_runs = true
 try
-eb = empirical_bayes(gamma_stats, priors, 10.0)
+eb = empirical_bayes(gamma_stats, priors, 10.0, Gamma)
 catch
 eb_at_least_runs = false
 end
@@ -221,7 +232,7 @@ end
 # Test that it runs without priors
 no_priors_eb_at_least_runs = true
 try
-eb = empirical_bayes(gamma_stats, 10.0)
+eb = empirical_bayes(gamma_stats, 10.0, Gamma)
 catch
 no_priors_eb_at_least_runs = false
 end
