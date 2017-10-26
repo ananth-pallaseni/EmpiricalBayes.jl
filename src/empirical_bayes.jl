@@ -255,7 +255,6 @@ function calculate_posterior(test_statistics, priors, null_distr, mixture_pdf, t
     null_pdf(x) = pdf(null_distr, x)
 
     # Prior function
-    w0 = 0
     prior_fn(x) = exp(w0) / ( exp(w0) + exp(x) )
 
     num_test_statistics = length(test_statistics)
@@ -313,7 +312,7 @@ end
 
 
 """
-    empirical_bayes(test_statistics, priors, num_bins, distr; proportion_to_keep=1.0, tail=:two, w0 = 0.0)
+    empirical_bayes(test_statistics, priors, num_bins, distr, proportion_to_keep=1.0, tail=:two, w0=0.0)
 
 Calculate the empirical Bayes posteriors of the input statistics using the priors.
 
@@ -322,35 +321,52 @@ Calculate the empirical Bayes posteriors of the input statistics using the prior
 - `priors` : one dimensional list of prior values that correspond with the
    test_statistics, such that `priors[i]` is the prior for `test_statistics[i]`.
 - `num_bins::Integer` : number of uniform width bins to discretize into.
+- `distr` : form of the null distribution to be fitted.
 - `proportion_to_keep=1.0` : Proportion of lowest test statistics to
    keep when calculating null distribution.
 - `tail=:two` : Whether the test is two-tailed (:two) or one-tailed (:lower or :upper)
 - `w0` : Default constant for the prior calculation
 """
-function empirical_bayes(test_statistics, priors, num_bins, distr; proportion_to_keep=1.0, tail=:two, w0 = 0.0)
+function empirical_bayes(test_statistics, priors, num_bins, distr; proportion_to_keep=1.0, tail=:two, w0=0.0)
      midpoints, counts, bin_width = discretize_test_statistics(test_statistics, num_bins)
      null_distr = fit_null_distribution(midpoints, counts, num_bins, bin_width, proportion_to_keep, distr)
      mixture_pdf = fit_mixture_distribution(midpoints, counts, bin_width)
      posteriors = calculate_posterior(test_statistics, priors, null_distr, mixture_pdf, tail, w0=w0)
      return posteriors
 end
-
+function empirical_bayes(test_statistics, priors, num_bins, distr::Symbol; proportion_to_keep=1.0, tail=:two, w0=0.0)
+    return empirical_bayes(test_statistics, priors, num_bins, get_distr(distr); proportion_to_keep=proportion_to_keep, tail=tail, w0=w0)
+end
 
 
 """
-    empirical_bayes(test_statistics, num_bins, distr, proportion_to_keep=1.0, tail=:two, w0 = 0.0)
+    empirical_bayes(test_statistics, num_bins, distr, proportion_to_keep=1.0, tail=:two, w0=0.0)
 
 Calculate the empirical Bayes posteriors of the input statistics with null priors.
 
 # Arguments
 - `test_statistics` : list of test statistics.
 - `num_bins::Integer` : number of uniform width bins to discretize into.
+- `distr` : form of the null distribution to be fitted.
 - `proportion_to_keep=1.0` : Proportion of lowest test statistics to
    keep when calculating null distribution.
 - `tail=:two` : Whether the test is two-tailed (:two) or one-tailed (:lower or :upper)
 - `w0` : Default constant for the prior calculation
 """
-function empirical_bayes(test_statistics, num_bins, distr; proportion_to_keep=1.0, tail=:two, w0 = 0.0)
+function empirical_bayes(test_statistics, num_bins, distr; proportion_to_keep=1.0, tail=:two, w0=0.0)
     priors = [0 for _ in test_statistics]
     return empirical_bayes(test_statistics, priors, num_bins, distr, proportion_to_keep=proportion_to_keep, tail=tail, w0=w0)
+end
+function empirical_bayes(test_statistics, num_bins, distr::Symbol; proportion_to_keep=1.0, tail=:two, w0=0.0)
+    return empirical_bayes(test_statistics, num_bins, get_distr(distr); proportion_to_keep=proportion_to_keep, tail=tail, w0=w0)
+end
+
+# Utility function for getting a distribution from a symbol, so that the caller needn't
+# depend on Distributions.jl
+function get_distr(d::Symbol)
+    distrs = Dict(
+        :Gamma => Gamma,
+        :Normal => Normal
+    )
+    return distrs[d]
 end
