@@ -227,6 +227,13 @@ catch
 eb_at_least_runs = false
 end
 @test eb_at_least_runs
+# With symbol for distribution
+try
+eb = empirical_bayes(gamma_stats, priors, 10.0, :Gamma)
+catch
+eb_at_least_runs = false
+end
+@test eb_at_least_runs
 
 
 # Test that it runs without priors
@@ -237,4 +244,12 @@ catch
 no_priors_eb_at_least_runs = false
 end
 @test no_priors_eb_at_least_runs
+# With symbol for distribution
+try
+eb = empirical_bayes(gamma_stats, 10.0, :Gamma)
+catch
+no_priors_eb_at_least_runs = false
+end
+@test no_priors_eb_at_least_runs
+
 end

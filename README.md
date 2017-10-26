@@ -26,7 +26,7 @@ Use the ```empirical_bayes``` function as follows:
 empirical_bayes(test_statistics, priors, num_bins, distr)
 ```
 
-where `test_statistics` and `priors` are lists such that `priors[i]` is the prior for `test_statistics[i]`, `num_bins` is the number of bins to discretize into and `distr` is the form of the null distribution (currently `Gamma` and `Normal` are supported).
+where `test_statistics` and `priors` are lists such that `priors[i]` is the prior for `test_statistics[i]`, `num_bins` is the number of bins to discretize into and `distr` is the form of the null distribution (currently `Gamma` and `Normal` are supported - alternatively `:Gamma` and `:Normal`, if the caller is not using Distributions.jl).
 
 This returns a list of posterior values such that `output[i]` is the posterior corresponding to applying `priors[i]` to `test_statistic[i]`.
 
@@ -53,7 +53,7 @@ applying the mode-matching algorithm.
 
 verbose is whether or not to print the proportion of values kept.
 """
-fit_null_distribution(midpoints, counts, num_bins, bin_width, proportion_to_keep, distr; verbose = true)
+fit_null_distribution(midpoints, counts, num_bins, bin_width, proportion_to_keep, distr, verbose=true)
 ```
 
 ```julia
@@ -89,5 +89,5 @@ to applying `priors[i]` to `test_statistic[i]`.
 proportion_to_keep is the proportion of lowest valued test_statistics to keep before
 applying the mode-matching algorithm when fitting the null distribution.
 """
-empirical_bayes(test_statistics, priors, num_bins, proportion_to_keep=1.0, tail=:two, w0 = 0.0)
+empirical_bayes(test_statistics, priors, num_bins, distr, proportion_to_keep=1.0, tail=:two, w0=0.0)
 ```
