@@ -248,8 +248,9 @@ mixture distribution.
 - `mixture_pdf` : function representing the mixture distribution of test statistics
 - `tail` : Whether the test is two-tailed (:two) or one-tailed (:lower or :upper)
 - `w0` : Default constant for the prior calculation
+- `null_value = -Inf` : what to set the unwanted tail values to
 """
-function calculate_posterior(test_statistics, priors, null_distr, mixture_pdf, tail; w0=0.0)
+function calculate_posterior(test_statistics, priors, null_distr, mixture_pdf, tail; w0=0.0, null_value = -Inf)
     @assert length(test_statistics) == size(priors, 1)
 
     null_pdf(x) = pdf(null_distr, x)
@@ -279,12 +280,12 @@ function calculate_posterior(test_statistics, priors, null_distr, mixture_pdf, t
         posterior[i] = p1
     end
 
-    # Zero the lower tail for an upper-tailed test, or vice-versa
+    # Get rid of the lower tail for an upper-tailed test, or vice-versa
     if tail == :upper || tail == :lower
         null_mode = mode(null_distr)
         compare = tail == :upper ? (<=) : (>=)
         zero_indices = find(t -> compare(t, null_mode), test_statistics)
-        posterior[zero_indices] = 0.0
+        posterior[zero_indices] = null_value
     end
 
     return posterior
@@ -303,8 +304,9 @@ mixture distribution.
 - `mixture_pdf` : function representing the mixture distribution of test statistics
 - `tail` : Whether the test is two-tailed (:two) or one-tailed (:lower or :upper)
 - `w0` : Default constant for the prior calculation
+- `null_value = -Inf` : what to set the unwanted tail values to
 """
-function calculate_posterior(test_statistics, null_distr, mixture_pdf, tail; w0=0.0)
+function calculate_posterior(test_statistics, null_distr, mixture_pdf, tail; w0=0.0, null_value = -Inf)
     priors = [0 for _ in test_statistics]
     return calculate_posterior(test_statistics, priors, null_distr, mixture_pdf, tail, w0=w0)
 end
@@ -326,16 +328,17 @@ Calculate the empirical Bayes posteriors of the input statistics using the prior
    keep when calculating null distribution.
 - `tail=:two` : Whether the test is two-tailed (:two) or one-tailed (:lower or :upper)
 - `w0` : Default constant for the prior calculation
+- `null_value = -Inf` : what to set the unwanted tail values to
 """
-function empirical_bayes(test_statistics, priors, num_bins, distr; proportion_to_keep=1.0, tail=:two, w0=0.0)
+function empirical_bayes(test_statistics, priors, num_bins, distr; proportion_to_keep=1.0, tail=:two, w0=0.0, null_value = -Inf)
      midpoints, counts, bin_width = discretize_test_statistics(test_statistics, num_bins)
      null_distr = fit_null_distribution(midpoints, counts, num_bins, bin_width, proportion_to_keep, distr)
      mixture_pdf = fit_mixture_distribution(midpoints, counts, bin_width)
-     posteriors = calculate_posterior(test_statistics, priors, null_distr, mixture_pdf, tail, w0=w0)
+     posteriors = calculate_posterior(test_statistics, priors, null_distr, mixture_pdf, tail, w0=w0, null_value = null_value)
      return posteriors
 end
-function empirical_bayes(test_statistics, priors, num_bins, distr::Symbol; proportion_to_keep=1.0, tail=:two, w0=0.0)
-    return empirical_bayes(test_statistics, priors, num_bins, get_distr(distr); proportion_to_keep=proportion_to_keep, tail=tail, w0=w0)
+function empirical_bayes(test_statistics, priors, num_bins, distr::Symbol; proportion_to_keep=1.0, tail=:two, w0=0.0, null_value = -Inf)
+    return empirical_bayes(test_statistics, priors, num_bins, get_distr(distr); proportion_to_keep=proportion_to_keep, tail=tail, w0=w0, null_value = null_value)
 end
 
 
@@ -352,13 +355,14 @@ Calculate the empirical Bayes posteriors of the input statistics with null prior
    keep when calculating null distribution.
 - `tail=:two` : Whether the test is two-tailed (:two) or one-tailed (:lower or :upper)
 - `w0` : Default constant for the prior calculation
+- `null_value = -Inf` : what to set the unwanted tail values to
 """
-function empirical_bayes(test_statistics, num_bins, distr; proportion_to_keep=1.0, tail=:two, w0=0.0)
+function empirical_bayes(test_statistics, num_bins, distr; proportion_to_keep=1.0, tail=:two, w0=0.0, null_value = -Inf)
     priors = [0 for _ in test_statistics]
-    return empirical_bayes(test_statistics, priors, num_bins, distr, proportion_to_keep=proportion_to_keep, tail=tail, w0=w0)
+    return empirical_bayes(test_statistics, priors, num_bins, distr, proportion_to_keep=proportion_to_keep, tail=tail, w0=w0, null_value = null_value)
 end
-function empirical_bayes(test_statistics, num_bins, distr::Symbol; proportion_to_keep=1.0, tail=:two, w0=0.0)
-    return empirical_bayes(test_statistics, num_bins, get_distr(distr); proportion_to_keep=proportion_to_keep, tail=tail, w0=w0)
+function empirical_bayes(test_statistics, num_bins, distr::Symbol; proportion_to_keep=1.0, tail=:two, w0=0.0, null_value = -Inf)
+    return empirical_bayes(test_statistics, num_bins, get_distr(distr); proportion_to_keep=proportion_to_keep, tail=tail, w0=w0, null_value = null_value)
 end
 
 # Utility function for getting a distribution from a symbol, so that the caller needn't
