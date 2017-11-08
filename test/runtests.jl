@@ -198,12 +198,12 @@ test_post = calculate_posterior([0, 0], TestDist(1), y->1, :two)
 @test test_post ≈ [0.5, 0.5] atol=0.0001
 
 # One-tailed test, upper tail
-reference_post = [0.0, 0.0, 0.736384, 0.529118, 0.756652]
+reference_post = [-Inf, -Inf, 0.736384, 0.529118, 0.756652]
 test_post = calculate_posterior(test_statistics, test_priors, test_null_dist, test_mix_pdf, :upper)
 @test test_post ≈ reference_post atol=0.000001
 
 # One-tailed test, lower tail
-reference_post = [0.469082, 0.0, 0.0, 0.0, 0.0]
+reference_post = [0.469082, -Inf, -Inf, -Inf, -Inf]
 test_post = calculate_posterior(test_statistics, test_priors, test_null_dist, test_mix_pdf, :lower)
 @test test_post ≈ reference_post atol=0.000001
 
