@@ -1,6 +1,7 @@
 module EmpiricalBayes
 
-
+using Pkg
+using DelimitedFiles
 
 export
   discretize_test_statistics,
@@ -8,7 +9,6 @@ export
   fit_mixture_distribution,
   calculate_posterior,
   empirical_bayes
-
 
 include("empirical_bayes.jl")
 

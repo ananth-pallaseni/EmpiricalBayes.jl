@@ -1,5 +1,6 @@
 using EmpiricalBayes
-using Base.Test
+using Test
+using DelimitedFiles
 
 using Distributions
 using Distances

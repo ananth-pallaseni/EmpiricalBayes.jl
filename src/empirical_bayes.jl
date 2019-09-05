@@ -94,12 +94,11 @@ function estimate_fit_parameters(num_bins, bin_width, midpoints, counts, distr::
 
     # Minus difference h to create regression target
     h = log(num_bins * bin_width)
-    y = log_counts - h
-
+    y = log_counts .- h
 
     # Construct and solve the regression problem
     data = DataFrame(Y = y, X1 = midpoints, X2 = log.(midpoints))
-    C, eta1, eta2 = coef(glm(@formula(Y ~ X1 + X2), data, Normal(), minStepFac = eps()))
+    C, eta1, eta2 = coef(glm(@formula(Y ~ X1 + X2), data, Normal(), minstepfac = eps()))
 
     return C, eta1, eta2
 end
@@ -120,7 +119,7 @@ function estimate_fit_parameters(num_bins, bin_width, midpoints, counts, distr::
 
     # Construct and solve the regression problem
     data = DataFrame(Y = log_counts, X1 = midpoints, X2 = midpoints.^2)
-    beta0, beta1, beta2 = coef(glm(@formula(Y ~ X1 + X2), data, Normal(), minStepFac = eps()))
+    beta0, beta1, beta2 = coef(glm(@formula(Y ~ X1 + X2), data, Normal(), minstepfac = eps()))
 
     return beta0, beta1, beta2
 end
@@ -213,9 +212,9 @@ function fit_mixture_distribution(midpoints, counts, bin_width)
     # Add some zero bins on the beginning to prevent curve going negative
     number_of_zero_bins = 10 #3
     zero_bins = zeros(number_of_zero_bins)
-    unshift!(counts, zero_bins...)
+    pushfirst!(counts, zero_bins...)
     for i in 1 : number_of_zero_bins
-        unshift!(midpoints, midpoints[1] - bin_width)
+        pushfirst!(midpoints, midpoints[1] - bin_width)
     end
 
     # Normalize counts
@@ -223,11 +222,12 @@ function fit_mixture_distribution(midpoints, counts, bin_width)
     counts = counts / (num_statsitics * bin_width)
 
     # Fit spline to histogram points
-    interpolation = interpolate(counts, BSpline(Cubic(Line())), OnCell())
-    r = linspace(midpoints[1], midpoints[end], length(midpoints))
+    interpolation = interpolate(counts, BSpline(Cubic(Line(OnCell()))))
+    r = range(midpoints[1], stop=midpoints[end], length=length(midpoints))
     scaled_interpolation = Interpolations.scale(interpolation, r)
+    scaled_extrapolation = extrapolate(scaled_interpolation, Line())
 
-    fhat(x) = max(scaled_interpolation[x], 0)
+    fhat(x) = max(scaled_extrapolation(x), 0)
     fhat(x::AbstractArray) = [fhat(i) for i in x]
 
     return fhat
@@ -261,7 +261,7 @@ function calculate_posterior(test_statistics, priors, null_distr, mixture_pdf, t
     num_test_statistics = length(test_statistics)
 
     # Posterior array
-    posterior = Array{Float64}(num_test_statistics)
+    posterior = Array{Float64}(undef, num_test_statistics)
 
     for i in 1:num_test_statistics
         ts = test_statistics[i]
@@ -284,8 +284,8 @@ function calculate_posterior(test_statistics, priors, null_distr, mixture_pdf, t
     if tail == :upper || tail == :lower
         null_mode = mode(null_distr)
         compare = tail == :upper ? (<=) : (>=)
-        zero_indices = find(t -> compare(t, null_mode), test_statistics)
-        posterior[zero_indices] = null_value
+        zero_indices = findall(t -> compare(t, null_mode), test_statistics)
+        posterior[zero_indices] .= null_value
     end
 
     return posterior
