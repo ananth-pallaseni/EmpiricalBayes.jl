@@ -11,7 +11,7 @@ struct TestDist <: ContinuousUnivariateDistribution
     x::Int
 end
 
-Distributions.pdf(d::TestDist, n) = d.x
+Distributions.pdf(d::TestDist, n::Real) = d.x
 Distributions.mode(d::TestDist) = d.x
 
 ############################# Discretization ###########################

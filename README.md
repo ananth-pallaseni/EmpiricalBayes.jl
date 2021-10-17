@@ -15,8 +15,9 @@ See [NetworkInference.jl](https://github.com/Tchanders/NetworkInference.jl) for 
 
 
 ## Installation
+Use ']' to enter Pkg mode, then
 ```julia
-Pkg.clone("https://github.com/ananth-pallaseni/EmpiricalBayes.jl.git")
+pkg> add https://github.com/ananth-pallaseni/EmpiricalBayes.jl
 ```
 
 ## Basic Usage
